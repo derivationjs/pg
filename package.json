@@ -1,0 +1,36 @@
+{
+  "name": "@derivation/pg",
+  "version": "0.1.5",
+  "description": "PostgreSQL persistence for derivation logs",
+  "author": "Daniel Waterworth",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepare": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  },
+  "dependencies": {
+    "derivation": "^0.1.5",
+    "immutable": "^5.1.4",
+    "postgres": "^3.4.5",
+    "zod": "^4.3.5"
+  }
+}

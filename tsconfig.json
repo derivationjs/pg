@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    "module": "ES2022",
+    "target": "ES2022",
+    "types": ["node"],
+    "moduleResolution": "Bundler"
+  },
+  "include": ["src"]
+}
