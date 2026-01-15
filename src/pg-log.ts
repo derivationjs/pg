@@ -1,6 +1,6 @@
 import { List } from "immutable";
 import type { Sql } from "postgres";
-import type { Graph, ReactiveLogSource, ReactiveValue } from "derivation";
+import type { Graph, ReactiveLogSource, ReactiveValue, ReactiveLog } from "derivation";
 import type { PgNotifier } from "./pg-notifier.js";
 import type { z } from "zod";
 
@@ -106,23 +106,7 @@ export class PgLog<T> {
     this.log.pushAll(List(rows));
   }
 
-  get snapshot(): List<LogRow<T>> {
-    return this.log.snapshot;
-  }
-
-  get changes(): ReactiveValue<List<LogRow<T>>> {
-    return this.log.changes;
-  }
-
-  get materialized(): ReactiveValue<List<LogRow<T>>> {
-    return this.log.materialized;
-  }
-
-  get length(): ReactiveValue<number> {
-    return this.log.length;
-  }
-
-  fold<S>(initial: S, reducer: (acc: S, item: LogRow<T>) => S): ReactiveValue<S> {
-    return this.log.fold(initial, reducer);
+  get asLog(): ReactiveLog<LogRow<T>> {
+    return this.log;
   }
 }

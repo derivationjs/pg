@@ -40,8 +40,8 @@ describe("PgLog", () => {
   it("loads empty table", async () => {
     const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
 
-    expect(log.snapshot.size).toBe(0);
-    expect(log.length.value).toBe(0);
+    expect(log.asLog.snapshot.size).toBe(0);
+    expect(log.asLog.length.value).toBe(0);
   });
 
   it("appends and persists", async () => {
@@ -54,8 +54,8 @@ describe("PgLog", () => {
 
     graph.step();
 
-    expect(log.snapshot.size).toBe(1);
-    expect(log.snapshot.get(0)?.data).toEqual({ value: 42 });
+    expect(log.asLog.snapshot.size).toBe(1);
+    expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 42 });
   });
 
   it("loads existing rows on create", async () => {
@@ -64,8 +64,8 @@ describe("PgLog", () => {
 
     const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
 
-    expect(log.snapshot.size).toBe(1);
-    expect(log.snapshot.get(0)?.data).toEqual({ value: 42 });
+    expect(log.asLog.snapshot.size).toBe(1);
+    expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 42 });
   });
 
   it("appendAll inserts multiple rows", async () => {
@@ -79,8 +79,8 @@ describe("PgLog", () => {
     expect(rows[1]?.seq).toBe(2);
     expect(rows[2]?.seq).toBe(3);
 
-    expect(log.snapshot.size).toBe(3);
-    expect(log.length.value).toBe(3);
+    expect(log.asLog.snapshot.size).toBe(3);
+    expect(log.asLog.length.value).toBe(3);
   });
 
   it("fold works over persisted data", async () => {
@@ -89,7 +89,7 @@ describe("PgLog", () => {
     await log.appendAll([{ value: 10 }, { value: 20 }, { value: 30 }]);
     graph.step();
 
-    const sum = log.fold(0, (acc, row) => acc + row.data.value);
+    const sum = log.asLog.fold(0, (acc, row) => acc + row.data.value);
     expect(sum.value).toBe(60);
 
     await log.append({ value: 5 });
@@ -105,14 +105,14 @@ describe("PgLog", () => {
     await sql`INSERT INTO test_log (data) VALUES ('{"value": 100}'::jsonb)`;
     await sql`INSERT INTO test_log (data) VALUES ('{"value": 200}'::jsonb)`;
 
-    expect(log.snapshot.size).toBe(0);
+    expect(log.asLog.snapshot.size).toBe(0);
 
     await log.poll();
     graph.step();
 
-    expect(log.snapshot.size).toBe(2);
-    expect(log.snapshot.get(0)?.data).toEqual({ value: 100 });
-    expect(log.snapshot.get(1)?.data).toEqual({ value: 200 });
+    expect(log.asLog.snapshot.size).toBe(2);
+    expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 100 });
+    expect(log.asLog.snapshot.get(1)?.data).toEqual({ value: 200 });
   });
 
   it("rejects invalid data on append", async () => {
