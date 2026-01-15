@@ -63,7 +63,6 @@ export class PgLog<T> {
       throw new Error("Insert failed");
     }
     const row = parseRow(rawRow, this.schema);
-    this.log.push(row);
     await this.notifier.notify();
     return row;
   }
@@ -80,7 +79,6 @@ export class PgLog<T> {
       RETURNING seq, data
     `;
     const rows = rawRows.map((raw) => parseRow(raw, this.schema));
-    this.log.pushAll(List(rows));
     await this.notifier.notify();
     return rows;
   }
