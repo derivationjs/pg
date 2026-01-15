@@ -90,6 +90,8 @@ export class PgLog<T> {
     `;
     const tableCount = Number(result?.count ?? 0);
 
+    console.log(`📊 Poll: local=${localCount}, table=${tableCount}`);
+
     if (tableCount <= localCount) return;
 
     const diff = tableCount - localCount;
@@ -100,6 +102,7 @@ export class PgLog<T> {
     `;
     // Reverse to get ascending order, validate each row
     const rows = rawRows.reverse().map((raw) => parseRow(raw, this.schema));
+    console.log(`📊 Poll: fetched ${rows.length} new rows`);
     this.log.pushAll(List(rows));
   }
 
