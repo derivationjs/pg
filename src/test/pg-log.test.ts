@@ -3,7 +3,6 @@ import postgres from "postgres";
 import { z } from "zod";
 import { Graph } from "derivation";
 import { PgLog } from "../pg-log.js";
-import { PgNotifier } from "../pg-notifier.js";
 
 const sql = postgres({
   host: "/var/run/postgresql",
@@ -15,7 +14,6 @@ const TestDataSchema = z.object({
 
 describe("PgLog", () => {
   let graph: Graph;
-  let notifier: PgNotifier;
 
   beforeAll(async () => {
     await sql`
@@ -29,7 +27,6 @@ describe("PgLog", () => {
   beforeEach(async () => {
     await sql`TRUNCATE test_log RESTART IDENTITY`;
     graph = new Graph();
-    notifier = new PgNotifier(sql, graph);
   });
 
   afterAll(async () => {
@@ -38,70 +35,66 @@ describe("PgLog", () => {
   });
 
   it("loads empty table", async () => {
-    const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
+    const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
     expect(log.asLog.snapshot.size).toBe(0);
     expect(log.asLog.length.value).toBe(0);
   });
 
-  it("appends and persists", async () => {
-    const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
+  it("loads existing rows on create", async () => {
+    await sql`INSERT INTO test_log (data) VALUES ('{"value": 42}'::jsonb)`;
 
-    const row = await log.append({ value: 42 });
-
-    expect(row.seq).toBe(1);
-    expect(row.data).toEqual({ value: 42 });
-
-    graph.step();
+    const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
     expect(log.asLog.snapshot.size).toBe(1);
     expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 42 });
   });
 
-  it("loads existing rows on create", async () => {
-    // Insert data first
-    await sql`INSERT INTO test_log (data) VALUES ('{"value": 42}'::jsonb)`;
+  it("appends and persists", async () => {
+    const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
-    const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
+    await log.append({ value: 42 });
+
+    await log.poll();
+    graph.step();
 
     expect(log.asLog.snapshot.size).toBe(1);
     expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 42 });
   });
 
   it("appendAll inserts multiple rows", async () => {
-    const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
+    const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
-    const rows = await log.appendAll([{ value: 1 }, { value: 2 }, { value: 3 }]);
+    await log.appendAll([{ value: 1 }, { value: 2 }, { value: 3 }]);
+
+    await log.poll();
     graph.step();
-
-    expect(rows.length).toBe(3);
-    expect(rows[0]?.seq).toBe(1);
-    expect(rows[1]?.seq).toBe(2);
-    expect(rows[2]?.seq).toBe(3);
 
     expect(log.asLog.snapshot.size).toBe(3);
     expect(log.asLog.length.value).toBe(3);
   });
 
   it("fold works over persisted data", async () => {
-    const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
+    const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
     await log.appendAll([{ value: 10 }, { value: 20 }, { value: 30 }]);
+
+    await log.poll();
     graph.step();
 
     const sum = log.asLog.fold(0, (acc, row) => acc + row.data.value);
     expect(sum.value).toBe(60);
 
     await log.append({ value: 5 });
+    await log.poll();
     graph.step();
 
     expect(sum.value).toBe(65);
   });
 
   it("poll syncs new rows from database", async () => {
-    const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
+    const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
-    // Insert directly into database (simulating another process)
     await sql`INSERT INTO test_log (data) VALUES ('{"value": 100}'::jsonb)`;
     await sql`INSERT INTO test_log (data) VALUES ('{"value": 200}'::jsonb)`;
 
@@ -116,26 +109,24 @@ describe("PgLog", () => {
   });
 
   it("rejects invalid data on append", async () => {
-    const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
+    const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
     // @ts-expect-error - intentionally passing invalid data
     await expect(log.append({ value: "not a number" })).rejects.toThrow();
   });
 
   it("rejects invalid data on load", async () => {
-    // Insert invalid data directly
-    await sql`INSERT INTO test_log (data) VALUES ('{"value": "bad"}'::jsonb)`;
+    await sql`INSERT INTO test_log (data) VALUES ('{"value": "invalid"}'::jsonb)`;
 
     await expect(
-      PgLog.create(sql, "test_log", graph, notifier, TestDataSchema)
+      PgLog.create(sql, "test_log", graph, TestDataSchema),
     ).rejects.toThrow();
   });
 
   it("rejects invalid data on poll", async () => {
-    const log = await PgLog.create(sql, "test_log", graph, notifier, TestDataSchema);
+    const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
-    // Insert invalid data directly
-    await sql`INSERT INTO test_log (data) VALUES ('{"value": "bad"}'::jsonb)`;
+    await sql`INSERT INTO test_log (data) VALUES ('{"value": "invalid"}'::jsonb)`;
 
     await expect(log.poll()).rejects.toThrow();
   });

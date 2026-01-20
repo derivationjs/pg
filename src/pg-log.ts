@@ -1,7 +1,6 @@
 import { List } from "immutable";
 import type { Sql } from "postgres";
-import type { Graph, ReactiveLogSource, ReactiveValue, ReactiveLog } from "derivation";
-import type { PgNotifier } from "./pg-notifier.js";
+import type { Graph, ReactiveLogSource, ReactiveLog } from "derivation";
 import type { z } from "zod";
 
 export interface LogRow<T> {
@@ -10,13 +9,14 @@ export interface LogRow<T> {
 }
 
 interface RawRow {
-  seq: string;
+  seq: number;
   data: unknown;
 }
 
 function parseRow<T>(raw: RawRow, schema: z.ZodType<T>): LogRow<T> {
   const seq = Number(raw.seq);
-  const jsonData = typeof raw.data === "string" ? JSON.parse(raw.data) : raw.data;
+  const jsonData =
+    typeof raw.data === "string" ? JSON.parse(raw.data) : raw.data;
   const data = schema.parse(jsonData);
   return { seq, data };
 }
@@ -27,7 +27,6 @@ export class PgLog<T> {
   private constructor(
     private readonly sql: Sql,
     private readonly table: string,
-    private readonly notifier: PgNotifier,
     private readonly schema: z.ZodType<T>,
     log: ReactiveLogSource<LogRow<T>>,
   ) {
@@ -38,7 +37,6 @@ export class PgLog<T> {
     sql: Sql,
     table: string,
     graph: Graph,
-    notifier: PgNotifier,
     schema: z.ZodType<T>,
   ): Promise<PgLog<T>> {
     const rawRows = await sql<RawRow[]>`
@@ -47,61 +45,32 @@ export class PgLog<T> {
     const rows = rawRows.map((raw) => parseRow(raw, schema));
     const snapshot = List(rows);
     const log = graph.inputLog<LogRow<T>>(snapshot);
-    return new PgLog<T>(sql, table, notifier, schema, log);
+    return new PgLog<T>(sql, table, schema, log);
   }
 
-  async append(data: T): Promise<LogRow<T>> {
-    // Validate input before inserting
-    const validated = this.schema.parse(data);
-
-    const [rawRow] = await this.sql<RawRow[]>`
-      INSERT INTO ${this.sql(this.table)} (data)
-      VALUES (${JSON.stringify(validated)}::jsonb)
-      RETURNING seq, data
-    `;
-    if (!rawRow) {
-      throw new Error("Insert failed");
-    }
-    const row = parseRow(rawRow, this.schema);
-    await this.notifier.notify();
-    return row;
+  async append(data: T): Promise<void> {
+    await this.appendAll([data]);
   }
 
-  async appendAll(items: T[]): Promise<LogRow<T>[]> {
-    if (items.length === 0) return [];
+  async appendAll(items: T[]): Promise<void> {
+    if (items.length === 0) return;
 
-    // Validate all inputs before inserting
     const validated = items.map((item) => this.schema.parse(item));
 
-    const rawRows = await this.sql<RawRow[]>`
+    await this.sql<RawRow[]>`
       INSERT INTO ${this.sql(this.table)} (data)
-      VALUES ${this.sql(validated.map(data => [JSON.stringify(data)]))}
-      RETURNING seq, data
+      VALUES ${this.sql(validated.map((data) => [JSON.stringify(data)]))}
     `;
-    const rows = rawRows.map((raw) => parseRow(raw, this.schema));
-    await this.notifier.notify();
-    return rows;
   }
 
   async poll(): Promise<void> {
-    const localCount = this.log.length.value;
-    const [result] = await this.sql<[{ count: string }]>`
-      SELECT COUNT(*)::text as count FROM ${this.sql(this.table)}
-    `;
-    const tableCount = Number(result?.count ?? 0);
-
-    console.log(`📊 Poll: local=${localCount}, table=${tableCount}`);
-
-    if (tableCount <= localCount) return;
-
-    const diff = tableCount - localCount;
+    const lastSeq = this.log.snapshot.last()?.seq ?? 0;
     const rawRows = await this.sql<RawRow[]>`
       SELECT seq, data FROM ${this.sql(this.table)}
-      ORDER BY seq DESC
-      LIMIT ${diff}
+      WHERE seq > ${lastSeq}
+      ORDER BY seq ASC
     `;
-    // Reverse to get ascending order, validate each row
-    const rows = rawRows.reverse().map((raw) => parseRow(raw, this.schema));
+    const rows = rawRows.map((raw) => parseRow(raw, this.schema));
     console.log(`📊 Poll: fetched ${rows.length} new rows`);
     this.log.pushAll(List(rows));
   }

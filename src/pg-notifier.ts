@@ -1,50 +1,27 @@
 import type { Sql } from "postgres";
-import type { Graph } from "derivation";
-
-export interface Pollable {
-  poll(): Promise<void>;
-}
 
 export class PgNotifier {
-  private unlisten: (() => Promise<void>) | null = null;
-  private pollables: Pollable[] = [];
+  private listen: Promise<void> | null = null;
 
   constructor(
     private readonly sql: Sql,
-    private readonly graph: Graph,
-    private readonly channel: string = "derivation",
+    private readonly channel: string = "step",
   ) {}
 
-  register(pollable: Pollable): void {
-    this.pollables.push(pollable);
-  }
+  wait(): Promise<void> {
+    if (!this.listen) {
+      this.listen = new Promise((resolve) =>
+        this.sql.listen(this.channel, () => resolve()),
+      );
 
-  async start(): Promise<void> {
-    if (this.unlisten) return;
-
-    console.log(`👂 Starting listener on channel "${this.channel}"`);
-    const result = await this.sql.listen(this.channel, async () => {
-      console.log("📬 Received notification, polling...");
-      for (const pollable of this.pollables) {
-        await pollable.poll();
-      }
-      console.log("📬 Polling complete, stepping graph...");
-      this.graph.step();
-      console.log("📬 Graph stepped");
-    });
-    this.unlisten = result.unlisten;
-    console.log(`👂 Listener started`);
+      this.listen.then(() => {
+        this.listen = null;
+      });
+    }
+    return this.listen;
   }
 
   async notify(): Promise<void> {
-    console.log(`📤 Sending notification on channel "${this.channel}"`);
     await this.sql.notify(this.channel, "");
-    console.log(`📤 Notification sent`);
-  }
-
-  async stop(): Promise<void> {
-    if (!this.unlisten) return;
-    await this.unlisten();
-    this.unlisten = null;
   }
 }
