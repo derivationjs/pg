@@ -37,7 +37,7 @@ describe("PgLog", () => {
   it("loads empty table", async () => {
     const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
-    expect(log.asLog.snapshot.size).toBe(0);
+    expect(log.asLog.snapshot.length).toBe(0);
     expect(log.asLog.length.value).toBe(0);
   });
 
@@ -46,7 +46,7 @@ describe("PgLog", () => {
 
     const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
-    expect(log.asLog.snapshot.size).toBe(1);
+    expect(log.asLog.snapshot.length).toBe(1);
     expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 42 });
   });
 
@@ -58,7 +58,7 @@ describe("PgLog", () => {
     await log.poll();
     graph.step();
 
-    expect(log.asLog.snapshot.size).toBe(1);
+    expect(log.asLog.snapshot.length).toBe(1);
     expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 42 });
   });
 
@@ -70,7 +70,7 @@ describe("PgLog", () => {
     await log.poll();
     graph.step();
 
-    expect(log.asLog.snapshot.size).toBe(3);
+    expect(log.asLog.snapshot.length).toBe(3);
     expect(log.asLog.length.value).toBe(3);
   });
 
@@ -98,12 +98,12 @@ describe("PgLog", () => {
     await sql`INSERT INTO test_log (data) VALUES ('{"value": 100}'::jsonb)`;
     await sql`INSERT INTO test_log (data) VALUES ('{"value": 200}'::jsonb)`;
 
-    expect(log.asLog.snapshot.size).toBe(0);
+    expect(log.asLog.snapshot.length).toBe(0);
 
     await log.poll();
     graph.step();
 
-    expect(log.asLog.snapshot.size).toBe(2);
+    expect(log.asLog.snapshot.length).toBe(2);
     expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 100 });
     expect(log.asLog.snapshot.get(1)?.data).toEqual({ value: 200 });
   });

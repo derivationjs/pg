@@ -1,6 +1,8 @@
-import { List } from "immutable";
+import { List } from "@rimbu/list";
 import type { Sql } from "postgres";
-import type { Graph, ReactiveLogSource, ReactiveLog } from "derivation";
+import type { Graph } from "derivation";
+import type { ReactiveLogSource, ReactiveLog } from "@derivation/relational";
+import { inputLog } from "@derivation/relational";
 import type { z } from "zod";
 
 export interface LogRow<T> {
@@ -43,8 +45,8 @@ export class PgLog<T> {
       SELECT seq, data FROM ${sql(table)} ORDER BY seq ASC
     `;
     const rows = rawRows.map((raw) => parseRow(raw, schema));
-    const snapshot = List(rows);
-    const log = graph.inputLog<LogRow<T>>(snapshot);
+    const snapshot = List.from(rows);
+    const log = inputLog(graph, snapshot);
     return new PgLog<T>(sql, table, schema, log);
   }
 
@@ -72,7 +74,7 @@ export class PgLog<T> {
     `;
     const rows = rawRows.map((raw) => parseRow(raw, this.schema));
     console.log(`📊 Poll: fetched ${rows.length} new rows`);
-    this.log.pushAll(List(rows));
+    this.log.pushAll(List.from(rows));
   }
 
   get asLog(): ReactiveLog<LogRow<T>> {
