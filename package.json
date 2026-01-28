@@ -1,6 +1,6 @@
 {
   "name": "@derivation/pg",
-  "version": "0.3.3",
+  "version": "0.3.5",
   "description": "PostgreSQL persistence for derivation logs",
   "author": "Daniel Waterworth",
   "license": "MIT",
@@ -20,16 +20,21 @@
     "prepare": "tsc -p tsconfig.json",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint src"
   },
   "devDependencies": {
-    "@types/node": "^25.0.10",
+    "@types/node": "^25.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-import": "^2.32.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@derivation/composable": "^0.3.3",
-    "derivation": "^0.3.0",
+    "@derivation/composable": "^0.3.5",
+    "derivation": "^0.3.5",
     "immutable": "^5.1.4",
     "postgres": "^3.4.8",
     "zod": "^4.3.6"
