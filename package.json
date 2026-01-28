@@ -1,6 +1,6 @@
 {
   "name": "@derivation/pg",
-  "version": "0.3.0",
+  "version": "0.3.3",
   "description": "PostgreSQL persistence for derivation logs",
   "author": "Daniel Waterworth",
   "license": "MIT",
@@ -28,9 +28,9 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@derivation/relational": "^0.3.0",
-    "@rimbu/list": "^2.1.10",
+    "@derivation/composable": "^0.3.3",
     "derivation": "^0.3.0",
+    "immutable": "^5.1.4",
     "postgres": "^3.4.8",
     "zod": "^4.3.6"
   }

@@ -1,8 +1,14 @@
-import { List } from "@rimbu/list";
+import { List } from "immutable";
 import type { Sql } from "postgres";
-import type { Graph } from "derivation";
-import type { ReactiveLogSource, ReactiveLog } from "@derivation/relational";
-import { inputLog } from "@derivation/relational";
+import type { Graph, ReactiveValue } from "derivation";
+import {
+  Reactive,
+  Log,
+  LogOperations,
+  LogChangeInput,
+  foldLog,
+  lengthLog,
+} from "@derivation/composable";
 import type { z } from "zod";
 
 export interface LogRow<T> {
@@ -24,15 +30,18 @@ function parseRow<T>(raw: RawRow, schema: z.ZodType<T>): LogRow<T> {
 }
 
 export class PgLog<T> {
-  private readonly log: ReactiveLogSource<LogRow<T>>;
+  private readonly logInput: LogChangeInput<LogRow<T>>;
+  private readonly reactiveLog: Reactive<Log<LogRow<T>>>;
 
   private constructor(
     private readonly sql: Sql,
     private readonly table: string,
     private readonly schema: z.ZodType<T>,
-    log: ReactiveLogSource<LogRow<T>>,
+    logInput: LogChangeInput<LogRow<T>>,
+    reactiveLog: Reactive<Log<LogRow<T>>>,
   ) {
-    this.log = log;
+    this.logInput = logInput;
+    this.reactiveLog = reactiveLog;
   }
 
   static async create<T>(
@@ -45,9 +54,18 @@ export class PgLog<T> {
       SELECT seq, data FROM ${sql(table)} ORDER BY seq ASC
     `;
     const rows = rawRows.map((raw) => parseRow(raw, schema));
-    const snapshot = List.from(rows);
-    const log = inputLog(graph, snapshot);
-    return new PgLog<T>(sql, table, schema, log);
+    const immutableList = List(rows);
+    const initialLog = new Log(immutableList);
+
+    const logInput = new LogChangeInput<LogRow<T>>(graph);
+    const reactiveLog = Reactive.create(
+      graph,
+      new LogOperations<LogRow<T>>(),
+      logInput,
+      initialLog,
+    );
+
+    return new PgLog<T>(sql, table, schema, logInput, reactiveLog);
   }
 
   async append(data: T): Promise<void> {
@@ -66,7 +84,8 @@ export class PgLog<T> {
   }
 
   async poll(): Promise<void> {
-    const lastSeq = this.log.snapshot.last()?.seq ?? 0;
+    const snapshot = this.reactiveLog.snapshot.toList();
+    const lastSeq = snapshot.last()?.seq ?? 0;
     const rawRows = await this.sql<RawRow[]>`
       SELECT seq, data FROM ${this.sql(this.table)}
       WHERE seq > ${lastSeq}
@@ -74,10 +93,22 @@ export class PgLog<T> {
     `;
     const rows = rawRows.map((raw) => parseRow(raw, this.schema));
     console.log(`📊 Poll: fetched ${rows.length} new rows`);
-    this.log.pushAll(List.from(rows));
+    this.logInput.pushAll(rows);
   }
 
-  get asLog(): ReactiveLog<LogRow<T>> {
-    return this.log;
+  get asLog() {
+    const reactiveLog = this.reactiveLog;
+    const graph = this.logInput.graph;
+    return {
+      get snapshot() {
+        return reactiveLog.snapshot.toList();
+      },
+      get length() {
+        return lengthLog(graph, reactiveLog);
+      },
+      fold<S>(initial: S, reducer: (acc: S, item: LogRow<T>) => S): ReactiveValue<S> {
+        return foldLog(graph, reactiveLog, initial, reducer);
+      },
+    };
   }
 }
