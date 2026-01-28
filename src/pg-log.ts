@@ -109,6 +109,12 @@ export class PgLog<T> {
       fold<S>(initial: S, reducer: (acc: S, item: LogRow<T>) => S): ReactiveValue<S> {
         return foldLog(graph, reactiveLog, initial, reducer);
       },
+      get reactive() {
+        return reactiveLog;
+      },
+      get graph() {
+        return graph;
+      },
     };
   }
 }
