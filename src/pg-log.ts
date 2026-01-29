@@ -96,25 +96,11 @@ export class PgLog<T> {
     this.logInput.pushAll(rows);
   }
 
-  get asLog() {
-    const reactiveLog = this.reactiveLog;
-    const graph = this.logInput.graph;
-    return {
-      get snapshot() {
-        return reactiveLog.snapshot.toList();
-      },
-      get length() {
-        return lengthLog(graph, reactiveLog);
-      },
-      fold<S>(initial: S, reducer: (acc: S, item: LogRow<T>) => S): ReactiveValue<S> {
-        return foldLog(graph, reactiveLog, initial, reducer);
-      },
-      get reactive() {
-        return reactiveLog;
-      },
-      get graph() {
-        return graph;
-      },
-    };
+  get reactive() {
+    return this.reactiveLog;
+  }
+
+  get graph() {
+    return this.logInput.graph;
   }
 }

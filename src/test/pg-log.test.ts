@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import postgres from "postgres";
 import { z } from "zod";
 import { Graph } from "derivation";
+import { lengthLog, foldLog } from "@derivation/composable";
 import { PgLog } from "../pg-log.js";
 
 const sql = postgres({
@@ -37,8 +38,8 @@ describe("PgLog", () => {
   it("loads empty table", async () => {
     const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
-    expect(log.asLog.snapshot.size).toBe(0);
-    expect(log.asLog.length.value).toBe(0);
+    expect(log.reactive.snapshot.toList().size).toBe(0);
+    expect(lengthLog(log.graph, log.reactive).value).toBe(0);
   });
 
   it("loads existing rows on create", async () => {
@@ -46,8 +47,8 @@ describe("PgLog", () => {
 
     const log = await PgLog.create(sql, "test_log", graph, TestDataSchema);
 
-    expect(log.asLog.snapshot.size).toBe(1);
-    expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 42 });
+    expect(log.reactive.snapshot.toList().size).toBe(1);
+    expect(log.reactive.snapshot.toList().get(0)?.data).toEqual({ value: 42 });
   });
 
   it("appends and persists", async () => {
@@ -58,8 +59,8 @@ describe("PgLog", () => {
     await log.poll();
     graph.step();
 
-    expect(log.asLog.snapshot.size).toBe(1);
-    expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 42 });
+    expect(log.reactive.snapshot.toList().size).toBe(1);
+    expect(log.reactive.snapshot.toList().get(0)?.data).toEqual({ value: 42 });
   });
 
   it("appendAll inserts multiple rows", async () => {
@@ -70,8 +71,8 @@ describe("PgLog", () => {
     await log.poll();
     graph.step();
 
-    expect(log.asLog.snapshot.size).toBe(3);
-    expect(log.asLog.length.value).toBe(3);
+    expect(log.reactive.snapshot.toList().size).toBe(3);
+    expect(lengthLog(log.graph, log.reactive).value).toBe(3);
   });
 
   it("fold works over persisted data", async () => {
@@ -82,7 +83,7 @@ describe("PgLog", () => {
     await log.poll();
     graph.step();
 
-    const sum = log.asLog.fold(0, (acc, row) => acc + row.data.value);
+    const sum = foldLog(log.graph, log.reactive, 0, (acc, row) => acc + row.data.value);
     expect(sum.value).toBe(60);
 
     await log.append({ value: 5 });
@@ -98,14 +99,14 @@ describe("PgLog", () => {
     await sql`INSERT INTO test_log (data) VALUES ('{"value": 100}'::jsonb)`;
     await sql`INSERT INTO test_log (data) VALUES ('{"value": 200}'::jsonb)`;
 
-    expect(log.asLog.snapshot.size).toBe(0);
+    expect(log.reactive.snapshot.toList().size).toBe(0);
 
     await log.poll();
     graph.step();
 
-    expect(log.asLog.snapshot.size).toBe(2);
-    expect(log.asLog.snapshot.get(0)?.data).toEqual({ value: 100 });
-    expect(log.asLog.snapshot.get(1)?.data).toEqual({ value: 200 });
+    expect(log.reactive.snapshot.toList().size).toBe(2);
+    expect(log.reactive.snapshot.toList().get(0)?.data).toEqual({ value: 100 });
+    expect(log.reactive.snapshot.toList().get(1)?.data).toEqual({ value: 200 });
   });
 
   it("rejects invalid data on append", async () => {
