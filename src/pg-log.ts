@@ -58,7 +58,7 @@ export class PgLog<T> {
     const initialLog = new Log(immutableList);
 
     const logInput = new LogChangeInput<LogRow<T>>(graph);
-    const reactiveLog = Reactive.create(
+    const reactiveLog = Reactive.create<Log<LogRow<T>>>(
       graph,
       new LogOperations<LogRow<T>>(),
       logInput,
@@ -93,7 +93,7 @@ export class PgLog<T> {
     `;
     const rows = rawRows.map((raw) => parseRow(raw, this.schema));
     console.log(`📊 Poll: fetched ${rows.length} new rows`);
-    this.logInput.pushAll(rows);
+    this.logInput.addAll(rows);
   }
 
   get reactive() {
