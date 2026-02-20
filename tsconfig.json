@@ -15,10 +15,10 @@
     "rootDir": "./src",
     "outDir": "./dist",
 
-    "module": "ES2022",
+    "module": "NodeNext",
     "target": "ES2022",
     "types": ["node"],
-    "moduleResolution": "Bundler"
+    "moduleResolution": "NodeNext"
   },
   "include": ["src"]
 }

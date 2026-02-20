@@ -15,6 +15,7 @@ const TestDataSchema = z.object({
 
 describe("PgLog", () => {
   let graph: Graph;
+  const STATE_TABLE = "test_log__state";
 
   beforeAll(async () => {
     await sql`
@@ -27,11 +28,13 @@ describe("PgLog", () => {
 
   beforeEach(async () => {
     await sql`TRUNCATE test_log RESTART IDENTITY`;
+    await sql`DROP TABLE IF EXISTS ${sql(STATE_TABLE)}`;
     graph = new Graph();
   });
 
   afterAll(async () => {
     await sql`DROP TABLE IF EXISTS test_log`;
+    await sql`DROP TABLE IF EXISTS ${sql(STATE_TABLE)}`;
     await sql.end();
   });
 
@@ -130,5 +133,21 @@ describe("PgLog", () => {
     await sql`INSERT INTO test_log (data) VALUES ('{"value": "invalid"}'::jsonb)`;
 
     await expect(log.poll()).rejects.toThrow();
+  });
+
+  it("does not duplicate rows when poll is called twice before graph.step()", async () => {
+    const a = await PgLog.create(sql, "test_log", new Graph(), TestDataSchema);
+    const bGraph = new Graph();
+    const b = await PgLog.create(sql, "test_log", bGraph, TestDataSchema);
+
+    await a.appendAll([{ value: 1 }, { value: 2 }]);
+
+    await b.poll();
+    await b.poll();
+    bGraph.step();
+
+    expect(b.reactive.snapshot.toList().size).toBe(2);
+    expect(b.reactive.snapshot.toList().get(0)?.data).toEqual({ value: 1 });
+    expect(b.reactive.snapshot.toList().get(1)?.data).toEqual({ value: 2 });
   });
 });
